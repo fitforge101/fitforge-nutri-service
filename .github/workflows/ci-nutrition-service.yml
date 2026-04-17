@@ -9,7 +9,7 @@ on:
   #     - "services/nutrition-service/**"
   #     - ".github/workflows/ci-nutrition-service.yml"
   #     - ".github/workflows/_ci-template.yml"
-  # pull_request:
+  pull_request:
     branches:
       - develop
       - main
