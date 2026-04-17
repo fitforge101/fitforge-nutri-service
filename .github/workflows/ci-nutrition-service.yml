@@ -1,29 +1,68 @@
-name: CI - Nutrition Service
+name: CI — Nutrition Service
+
 on:
   push:
-    branches:
+    branches: 
       - develop
       - main
-    paths:
-      - "**"
+      - feature/ci-nutrition-service
+    # paths:
+      # - "services/user-service/**"
+      # - ".github/workflows/ci-user-service.yml"
+      # - ".github/workflows/_ci-template.yml"
   pull_request:
     branches:
       - develop
       - main
-    paths:
-      - "services/nutrition-service/**"
-      - ".github/workflows/ci-nutrition-service.yml"
-      - ".github/workflows/_ci-template.yml"
+      - feature/ci-nutrition-service
+    # paths:
+      # - "services/user-service/**"
+      # - ".github/workflows/ci-user-service.yml"
+      # - ".github/workflows/_ci-template.yml"
+
 # give the workflow permission to write to the repository contents
 permissions:
   contents: write
+
+
 jobs:
   ci:
-    uses: ./.github/workflows/_ci-template.yml
+    uses: fitforge101/fitforge-shared/.github/workflows/_ci-template.yml@feature/templates
     with:
       service-name: nutrition-service
       service-path: .
       runtime: node
+      node-version: "20"
       environment: ${{ github.ref_name }}
     secrets: inherit
-    ## Updated for develop branch
+
+# name: CI - Nutrition Service
+# on:
+#   push:
+#     branches:
+#       - develop
+#       - main
+#       - feature/*
+#     paths:
+#       - "**"
+#   pull_request:
+#     branches:
+#       - develop
+#       - main
+#     paths:
+#       - "services/nutrition-service/**"
+#       - ".github/workflows/ci-nutrition-service.yml"
+#       - ".github/workflows/_ci-template.yml"
+# # give the workflow permission to write to the repository contents
+# permissions:
+#   contents: write
+# jobs:
+#   ci:
+#     uses: ./.github/workflows/_ci-template.yml
+#     with:
+#       service-name: nutrition-service
+#       service-path: .
+#       runtime: node
+#       environment: ${{ github.ref_name }}
+#     secrets: inherit
+#     ## Updated for develop branch
