@@ -1,14 +1,11 @@
 name: CI - Nutrition Service
-
 on:
   push:
-    branches: 
+    branches:
       - develop
       - main
     paths:
-      - "services/nutrition-service/**"
-      - ".github/workflows/ci-nutrition-service.yml"
-      - ".github/workflows/_ci-template.yml"
+      - "**"
   pull_request:
     branches:
       - develop
@@ -17,20 +14,16 @@ on:
       - "services/nutrition-service/**"
       - ".github/workflows/ci-nutrition-service.yml"
       - ".github/workflows/_ci-template.yml"
-
 # give the workflow permission to write to the repository contents
 permissions:
   contents: write
-
-
 jobs:
   ci:
     uses: ./.github/workflows/_ci-template.yml
     with:
       service-name: nutrition-service
-      service-path: ./services/nutrition-service
+      service-path: .
       runtime: node
       environment: ${{ github.ref_name }}
     secrets: inherit
-
     ## Updated for develop branch

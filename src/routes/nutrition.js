@@ -1,9 +1,10 @@
 const express = require('express');
 const DietEntry = require('../models/DietEntry');
+const auth = require('../middleware/auth');
 const router = express.Router();
 
 // GET /nutrition/diet/:userId
-router.get('/diet/:userId', async (req, res) => {
+router.get('/diet/:userId', auth, async (req, res) => {
   try {
     const entries = await DietEntry.find({ userId: req.params.userId }).sort({ date: -1 }).limit(30);
     res.json(entries);
@@ -11,7 +12,7 @@ router.get('/diet/:userId', async (req, res) => {
 });
 
 // POST /nutrition/diet
-router.post('/diet', async (req, res) => {
+router.post('/diet', auth, async (req, res) => {
   try {
     const entry = await DietEntry.create(req.body);
     res.status(201).json(entry);
@@ -19,7 +20,7 @@ router.post('/diet', async (req, res) => {
 });
 
 // DELETE /nutrition/diet/:entryId
-router.delete('/diet/:entryId', async (req, res) => {
+router.delete('/diet/:entryId', auth, async (req, res) => {
   try {
     await DietEntry.findByIdAndDelete(req.params.entryId);
     res.json({ message: 'Entry deleted' });
