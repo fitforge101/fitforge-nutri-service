@@ -71,9 +71,10 @@ jobs:
       body: "CRITICAL vulnerabilities found in ai-service Docker image."
       service-name: nutrition-service
       artifact-name: trivy-nutrition-service
-    secrets:
+    secrets:T
       BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
 
+#DAST scan
 
   dast:
     name: DAST Scan (OWASP ZAP)
