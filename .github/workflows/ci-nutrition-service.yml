@@ -2,27 +2,28 @@ name: CI/CD - Nutrition Service
 
 on:
   push:
-    branches:
-      - develop
-      - main
+    branches: [develop, main]
   pull_request:
-    branches:
-      - develop
-      - main
+    branches: [develop, main]
+  release:
+    types: [created]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
+
+  # ─── SAST ───
   sast:
     if: github.event_name == 'pull_request'
-    uses: fitforge101/fitforge-shared/.github/workflows/_sast.yml@v2.0.0 
+    uses: fitforge101/fitforge-shared/.github/workflows/_sast.yml@v2.0.0
     with:
       service-path: .
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       SONAR_URL: ${{ secrets.SONAR_URL }}
-  # ─── SCA (Snyk) ───
+
+  # ─── SCA ───
   sca:
     needs: [sast]
     if: github.event_name == 'pull_request'
@@ -34,100 +35,109 @@ jobs:
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-  # ─── Notify: Snyk Criticals ───
-  notify-snyk:
-    needs: [sca]
-    if: needs.sca.outputs.critical-found == 'true'
-    uses: fitforge101/fitforge-shared/.github/workflows/_notify.yml@v2.0.0
-    with:
-      subject: "🚨 Snyk: Critical Vulnerabilities in nutrition-service"
-      body: "Critical/High vulnerabilities found in nutrition-service dependencies."
-      service-name: nutrition-service
-      artifact-name: snyk-report-nutrition-service
-    secrets:
-      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
-
-  # ─── Temp Docker Build + Trivy Scan ───
+  # ─── BUILD (CI ONLY) ───
   build:
-    needs: [sast, sca]
-    if: github.event_name == 'pull_request'
+    if: github.event_name != 'release'
     uses: fitforge101/fitforge-shared/.github/workflows/_docker-build.yml@v2.0.0
     with:
       service-name: nutrition-service
       service-path: .
 
-  # ─── Notify: Trivy Criticals ───
-  notify-trivy:
-    needs: [build]
-    if: needs.build.outputs.trivy-critical == 'true'
-    uses: fitforge101/fitforge-shared/.github/workflows/_notify.yml@v2.0.0
-    with:
-      subject: "🚨 Trivy: Critical Vulnerabilities in ai-service"
-      body: "CRITICAL vulnerabilities found in ai-service Docker image."
-      service-name: nutrition-service
-      artifact-name: trivy-nutrition-service
-    secrets:
-      BREVO_API_KEY: ${{ secrets.BREVO_API_KEY }}
 
-  # ─── Publish Docker Image (Tag + Build + Push) ───
+  # DEV FLOW 
+
+  dev-publish:
+    name: Build & Push Dev Image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set image tag (commit SHA)
+        run: |
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/nutrition-service:dev-${{ github.sha }}"
+          echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+          echo " Dev Image: $IMAGE"
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker Image
+        run: docker build -t $IMAGE .
+
+      - name: Push Docker Image
+        run: docker push $IMAGE
+
+
+  #  RELEASE FLOW 
+
   publish:
-    if: github.event_name == 'push'
-    uses: fitforge101/fitforge-shared/.github/workflows/_docker-publish.yml@v2.0.0
-    with:
-      service-name: nutrition-service
-      service-path: .
-      environment: ${{ github.ref_name }}
-    secrets:
-      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+    name: Build & Push (Release Only)
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
 
- # ─── Update Helm Chart (CD) ───
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Extract release tag
+        id: meta
+        run: |
+          TAG=${{ github.event.release.tag_name }}
+          IMAGE="${{ secrets.DOCKER_USERNAME }}/nutrition-service:$TAG"
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+
+          echo " Release tag: $TAG"
+          echo " Image: $IMAGE"
+
+      - name: Validate tag
+        run: |
+          if [ -z "${{ steps.meta.outputs.tag }}" ]; then
+            echo " No release tag found"
+            exit 1
+          fi
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Check if image exists
+        id: check
+        run: |
+          if docker manifest inspect ${{ steps.meta.outputs.image }} > /dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo " Image already exists. Skipping build."
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Docker Image
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          docker build -t ${{ steps.meta.outputs.image }} .
+          echo " Image built"
+
+      - name: Push Docker Image
+        if: steps.check.outputs.exists != 'true'
+        run: |
+          docker push ${{ steps.meta.outputs.image }}
+          echo " Image pushed"
+
+  # ─── CD ───
   cd:
+    name: Deploy via Helm (Release Only)
     needs: [publish]
     if: needs.publish.result == 'success'
     uses: fitforge101/fitforge-shared/.github/workflows/_cd-template.yml@feature/templates
     with:
       service-name: nutrition-service
-      image-tag: ${{ needs.publish.outputs.image-tag }}
-      environment: ${{ github.ref_name }}
+      image-tag: ${{ github.event.release.tag_name }}
+      environment: production
     secrets:
       HELM_REPO_PAT: ${{ secrets.HELM_REPO_PAT }}
-  ########
-
-
-# name: CI - Nutrition Service
-
-# on:
-#   push:
-#     branches: 
-#       - develop
-#       - main
-#   #   paths:
-#   #     - "services/nutrition-service/**"
-#   #     - ".github/workflows/ci-nutrition-service.yml"
-#   #     - ".github/workflows/_ci-template.yml"
-#   pull_request:
-#     branches:
-#       - develop
-#       - main
-#     # paths:
-#     #   - "services/nutrition-service/**"
-#     #   - ".github/workflows/ci-nutrition-service.yml"
-#     #   - ".github/workflows/_ci-template.yml"
-
-# # give the workflow permission to write to the repository contents
-# permissions:
-#   contents: write
-
-
-# jobs:
-#   ci:
-#     uses: fitforge101/fitforge-shared/.github/workflows/_docker-build.yml@v2.0.0
-#     with:
-#       service-name: nutrition-service
-#       service-path: .
-#       runtime: node
-#       environment: ${{ github.ref_name }}
-#     secrets: inherit
-
-#     ## Updated for develop branch
