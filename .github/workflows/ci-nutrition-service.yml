@@ -13,7 +13,7 @@ permissions:
 
 jobs:
 
-  # PR FLOW (ONLY HERE)
+  # PR FLOW 
  
   sast:
     if: github.event_name == 'pull_request'
@@ -43,7 +43,7 @@ jobs:
       service-name: nutrition-service
       service-path: .
 
-  # ✅ SINGLE PR CHECK
+  #  SINGLE PR CHECK
   pr-check:
     name: PR Quality Gate
     needs: [sast, sca, trivy]
