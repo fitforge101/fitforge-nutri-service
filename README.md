@@ -28,7 +28,7 @@ The `nutrition-service` tracks daily dietary intake. It allows users to log meal
 *Request:*
 ```json
 {
-  "userId": "64a1b2c3d4e5f67890123456",
+  "userId": "xxxxxxxxx",
   "mealType": "breakfast",
   "totalCalories": 450,
   "foodItems": [
